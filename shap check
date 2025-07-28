@@ -153,3 +153,93 @@ feature_impact, shap_values, significant_indices = analyze_tabular_shap_for_sign
 if feature_impact is not None:
     print("Tabular features driving significant prediction changes:")
     print(feature_impact.sort_values('mean_abs_shap', ascending=False))
+
+
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+def analyze_feature_importance(shap_values, tabular_feature_names, X_tabular_test):
+    """
+    Basic feature importance analysis from SHAP values
+    """
+    # Calculate mean absolute SHAP values for each feature
+    mean_abs_shap = np.mean(np.abs(shap_values.values), axis=0)
+    
+    # Create importance DataFrame
+    importance_df = pd.DataFrame({
+        'feature': tabular_feature_names,
+        'mean_abs_shap': mean_abs_shap,
+        'mean_shap': np.mean(shap_values.values, axis=0),  # Can be positive/negative
+        'std_shap': np.std(shap_values.values, axis=0)
+    }).sort_values('mean_abs_shap', ascending=False)
+    
+    print("Top 10 Most Important Tabular Features:")
+    print(importance_df.head(10))
+    
+    return importance_df
+
+# Usage
+importance_df = analyze_feature_importance(shap_values, tabular_feature_names, X_tabular_test)
+
+
+
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+def analyze_feature_importance(shap_values, tabular_feature_names, X_tabular_test):
+    """
+    Basic feature importance analysis from SHAP values
+    """
+    # Calculate mean absolute SHAP values for each feature
+    mean_abs_shap = np.mean(np.abs(shap_values.values), axis=0)
+    
+    # Create importance DataFrame
+    importance_df = pd.DataFrame({
+        'feature': tabular_feature_names,
+        'mean_abs_shap': mean_abs_shap,
+        'mean_shap': np.mean(shap_values.values, axis=0),  # Can be positive/negative
+        'std_shap': np.std(shap_values.values, axis=0)
+    }).sort_values('mean_abs_shap', ascending=False)
+    
+    print("Top 10 Most Important Tabular Features:")
+    print(importance_df.head(10))
+    
+    return importance_df
+
+# Usage
+importance_df = analyze_feature_importance(shap_values, tabular_feature_names, X_tabular_test)
+
+
+def create_waterfall_plots(shap_values, X_tabular_test, tabular_feature_names, 
+                          case_indices=None, n_cases=5):
+    """
+    Create waterfall plots for individual cases
+    """
+    if case_indices is None:
+        # Select cases with highest absolute SHAP sum
+        total_shap_impact = np.sum(np.abs(shap_values.values), axis=1)
+        case_indices = np.argsort(total_shap_impact)[-n_cases:]
+    
+    for i, case_idx in enumerate(case_indices):
+        plt.figure(figsize=(12, 8))
+        
+        # Create SHAP explanation object for waterfall plot
+        explanation = shap.Explanation(
+            values=shap_values.values[case_idx],
+            base_values=shap_values.base_values[case_idx] if hasattr(shap_values, 'base_values') else 0,
+            data=X_tabular_test[case_idx],
+            feature_names=tabular_feature_names
+        )
+        
+        shap.waterfall_plot(explanation, max_display=10)
+        plt.title(f'SHAP Waterfall Plot - Case {case_idx}')
+        plt.tight_layout()
+        plt.show()
+
+# Usage
+create_waterfall_plots(shap_values, X_tabular_test, tabular_feature_names)
