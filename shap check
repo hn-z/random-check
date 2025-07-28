@@ -1,0 +1,155 @@
+import shap
+import torch
+import numpy as np
+
+def create_tabular_prediction_wrapper(model, background_embeddings):
+    """
+    Create a wrapper function that only varies tabular features while keeping 
+    image embeddings fixed at their mean values
+    """
+    def predict_tabular_only(fea_tabular_batch):
+        """
+        Prediction function that takes only tabular features as input
+        """
+        batch_size = fea_tabular_batch.shape[0]
+        
+        # Use mean embeddings as background for image features
+        mean_emb_prcl = background_embeddings['mean_emb_prcl']
+        mean_emb_bldg = background_embeddings['mean_emb_bldg']
+        
+        # Create fixed embeddings for the batch
+        emb_prcl_batch = torch.tensor(mean_emb_prcl).repeat(batch_size, 1)
+        emb_bldg_batch = torch.tensor(mean_emb_bldg).repeat(batch_size, 1)
+        
+        # Convert tabular features to tensor
+        fea_tabular_tensor = torch.tensor(fea_tabular_batch, dtype=torch.float32)
+        
+        # Forward pass through model
+        model.eval()
+        with torch.no_grad():
+            predictions = model.forward_with_embeddings(
+                emb_prcl_batch, 
+                emb_bldg_batch, 
+                fea_tabular_tensor
+            )
+        
+        return predictions.numpy()
+    
+    return predict_tabular_only
+
+# Calculate background embeddings from training data
+def calculate_background_embeddings(train_dataset, model):
+    """Calculate mean embeddings from training data"""
+    all_emb_prcl = []
+    all_emb_bldg = []
+    
+    # Sample from training data
+    sample_size = min(1000, len(train_dataset))
+    indices = np.random.choice(len(train_dataset), sample_size, replace=False)
+    
+    model.eval()
+    with torch.no_grad():
+        for idx in indices:
+            loc_key, emb_prcl, emb_bldg, fea_tabular, target = train_dataset[idx]
+            
+            # Process through model's embedding layers if needed
+            # Or use raw embeddings if they're already processed
+            all_emb_prcl.append(emb_prcl.numpy())
+            all_emb_bldg.append(emb_bldg.numpy())
+    
+    return {
+        'mean_emb_prcl': np.mean(all_emb_prcl, axis=0),
+        'mean_emb_bldg': np.mean(all_emb_bldg, axis=0)
+    }
+
+# Usage
+background_embeddings = calculate_background_embeddings(train_dataset, model)
+tabular_pred_func = create_tabular_prediction_wrapper(model, background_embeddings)
+
+# Extract tabular features for SHAP analysis
+def extract_tabular_features(dataset, indices):
+    """Extract tabular features from dataset"""
+    tabular_features = []
+    for idx in indices:
+        _, _, _, fea_tabular, _ = dataset[idx]
+        tabular_features.append(fea_tabular.numpy())
+    return np.array(tabular_features)
+
+# Get background and test tabular features
+background_indices = np.random.choice(len(train_dataset), 100, replace=False)
+test_indices = range(min(500, len(test_dataset)))  # Adjust as needed
+
+X_tabular_background = extract_tabular_features(train_dataset, background_indices)
+X_tabular_test = extract_tabular_features(test_dataset, test_indices)
+
+# Calculate SHAP values
+explainer = shap.Explainer(tabular_pred_func, X_tabular_background)
+shap_values = explainer(X_tabular_test)
+
+
+
+def analyze_tabular_shap_for_significant_cases(model, dataset, tabular_feature_names):
+    """
+    Analyze SHAP values for cases where tabular features cause significant changes
+    """
+    # Get predictions from image-only and combined models
+    # (You'll need to implement image-only prediction)
+    
+    # Calculate prediction differences
+    pred_differences = []
+    all_tabular_features = []
+    significant_indices = []
+    
+    for idx in range(len(dataset)):
+        loc_key, emb_prcl, emb_bldg, fea_tabular, target = dataset[idx]
+        
+        # Get combined model prediction
+        with torch.no_grad():
+            combined_pred = model.forward_with_embeddings(
+                emb_prcl.unsqueeze(0), 
+                emb_bldg.unsqueeze(0), 
+                fea_tabular.unsqueeze(0)
+            ).item()
+            
+            # Get image-only prediction (using mean tabular features)
+            mean_tabular = torch.tensor(background_embeddings['mean_tabular'])
+            image_only_pred = model.forward_with_embeddings(
+                emb_prcl.unsqueeze(0), 
+                emb_bldg.unsqueeze(0), 
+                mean_tabular.unsqueeze(0)
+            ).item()
+        
+        pred_diff = abs(combined_pred - image_only_pred)
+        
+        if pred_diff > threshold:  # Define your threshold
+            pred_differences.append(combined_pred - image_only_pred)
+            all_tabular_features.append(fea_tabular.numpy())
+            significant_indices.append(idx)
+    
+    # Calculate SHAP for significant cases
+    if len(significant_indices) > 0:
+        X_significant = np.array(all_tabular_features)
+        shap_values_significant = explainer(X_significant)
+        
+        # Analyze results
+        feature_impact = pd.DataFrame({
+            'feature': tabular_feature_names,
+            'mean_abs_shap': np.mean(np.abs(shap_values_significant.values), axis=0),
+            'correlation_with_change': [
+                np.corrcoef(shap_values_significant.values[:, i], pred_differences)[0, 1]
+                for i in range(len(tabular_feature_names))
+            ]
+        })
+        
+        return feature_impact, shap_values_significant, significant_indices
+    
+    return None, None, []
+
+# Usage
+feature_impact, shap_values, significant_indices = analyze_tabular_shap_for_significant_cases(
+    model, test_dataset, tabular_feature_names
+)
+
+if feature_impact is not None:
+    print("Tabular features driving significant prediction changes:")
+    print(feature_impact.sort_values('mean_abs_shap', ascending=False))
