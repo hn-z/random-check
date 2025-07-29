@@ -278,69 +278,82 @@ feature_groups, numerical_features = create_feature_groups(tabular_feature_names
 print("Feature Groups:")
 for group_name, features in feature_groups.items():
     print(f"  {group_name}: {features}")
-
-
-def create_feature_groups(tabular_feature_names):
+def aggregate_categorical_shap_values(shap_values, tabular_feature_names, feature_groups):
     """
-    Define which features belong to the same categorical variable
+    Aggregate SHAP values for categorical features
     """
-    feature_groups = {}
-    numerical_features = []
+    aggregated_shap = {}
+    aggregated_feature_names = []
     
-    # Example mapping - adjust based on your actual feature names
-    feature_groups['location_type'] = [f for f in tabular_feature_names if f.startswith('location_type_')]
-    feature_groups['building_type'] = [f for f in tabular_feature_names if f.startswith('building_type_')]
-    feature_groups['coverage_type'] = [f for f in tabular_feature_names if f.startswith('coverage_type_')]
-    feature_groups['risk_category'] = [f for f in tabular_feature_names if f.startswith('risk_cat_')]
+    for group_name, group_features in feature_groups.items():
+        # Get indices of features in this group
+        group_indices = [tabular_feature_names.index(feat) for feat in group_features if feat in tabular_feature_names]
+        
+        if len(group_indices) == 1:
+            # Single feature (numerical or single category)
+            aggregated_shap[group_name] = shap_values.values[:, group_indices[0]]
+        else:
+            # Multiple features (categorical with multiple categories)
+            # Sum absolute values to get total contribution of the categorical variable
+            group_shap_values = shap_values.values[:, group_indices]
+            
+            # Method 1: Sum of absolute values
+            aggregated_shap[group_name] = np.sum(np.abs(group_shap_values), axis=1)
+            
+            # Method 2: Sum of raw values (can be negative)
+            # aggregated_shap[group_name] = np.sum(group_shap_values, axis=1)
+            
+            # Method 3: Max absolute value (dominant category)
+            # aggregated_shap[group_name] = group_shap_values[np.arange(len(group_shap_values)), 
+            #                                                 np.argmax(np.abs(group_shap_values), axis=1)]
+        
+        aggregated_feature_names.append(group_name)
     
-    # Identify numerical features (those not in any categorical group)
-    all_categorical_features = []
-    for group_features in feature_groups.values():
-        all_categorical_features.extend(group_features)
+    # Convert to array format
+    aggregated_shap_array = np.column_stack([aggregated_shap[name] for name in aggregated_feature_names])
     
-    numerical_features = [f for f in tabular_feature_names if f not in all_categorical_features]
-    
-    # Add numerical features as individual groups
-    for num_feat in numerical_features:
-        feature_groups[num_feat] = [num_feat]
-    
-    return feature_groups, numerical_features
+    return aggregated_shap_array, aggregated_feature_names, aggregated_shap
 
 # Usage
-feature_groups, numerical_features = create_feature_groups(tabular_feature_names)
-print("Feature Groups:")
-for group_name, features in feature_groups.items():
-    print(f"  {group_name}: {features}")
+aggregated_shap_values, aggregated_feature_names, shap_dict = aggregate_categorical_shap_values(
+    shap_values, tabular_feature_names, feature_groups
+)
 
 
-def create_feature_groups(tabular_feature_names):
+def plot_combined_feature_importance(aggregated_shap_values, aggregated_feature_names):
     """
-    Define which features belong to the same categorical variable
+    Plot feature importance with combined categorical features
     """
-    feature_groups = {}
-    numerical_features = []
+    # Calculate mean absolute SHAP values
+    mean_abs_shap = np.mean(np.abs(aggregated_shap_values), axis=0)
     
-    # Example mapping - adjust based on your actual feature names
-    feature_groups['location_type'] = [f for f in tabular_feature_names if f.startswith('location_type_')]
-    feature_groups['building_type'] = [f for f in tabular_feature_names if f.startswith('building_type_')]
-    feature_groups['coverage_type'] = [f for f in tabular_feature_names if f.startswith('coverage_type_')]
-    feature_groups['risk_category'] = [f for f in tabular_feature_names if f.startswith('risk_cat_')]
+    # Create DataFrame
+    importance_df = pd.DataFrame({
+        'feature': aggregated_feature_names,
+        'importance': mean_abs_shap,
+        'mean_shap': np.mean(aggregated_shap_values, axis=0)
+    }).sort_values('importance', ascending=True)
     
-    # Identify numerical features (those not in any categorical group)
-    all_categorical_features = []
-    for group_features in feature_groups.values():
-        all_categorical_features.extend(group_features)
+    # Plot
+    plt.figure(figsize=(10, 8))
+    colors = ['red' if x < 0 else 'blue' for x in importance_df['mean_shap']]
     
-    numerical_features = [f for f in tabular_feature_names if f not in all_categorical_features]
+    plt.barh(range(len(importance_df)), importance_df['importance'], color=colors, alpha=0.7)
+    plt.yticks(range(len(importance_df)), importance_df['feature'])
+    plt.xlabel('Mean Absolute SHAP Value')
+    plt.title('Combined Feature Importance (Categorical + Numerical)')
+    plt.grid(True, alpha=0.3)
     
-    # Add numerical features as individual groups
-    for num_feat in numerical_features:
-        feature_groups[num_feat] = [num_feat]
+    # Add legend
+    from matplotlib.patches import Patch
+    legend_elements = [Patch(facecolor='blue', alpha=0.7, label='Positive Average Impact'),
+                      Patch(facecolor='red', alpha=0.7, label='Negative Average Impact')]
+    plt.legend(handles=legend_elements)
     
-    return feature_groups, numerical_features
+    plt.tight_layout()
+    plt.show()
+    
+    return importance_df
 
 # Usage
-feature_groups, numerical_features = create_feature_groups(tabular_feature_names)
-print("Feature Groups:")
-for group_name, features in feature_groups.items():
-    print(f"  {group_name}: {features}")
+combined_importance = plot_combined_feature_importance(aggregated_shap_values, aggregated_feature_names)
