@@ -243,3 +243,104 @@ def create_waterfall_plots(shap_values, X_tabular_test, tabular_feature_names,
 
 # Usage
 create_waterfall_plots(shap_values, X_tabular_test, tabular_feature_names)
+
+
+
+
+def create_feature_groups(tabular_feature_names):
+    """
+    Define which features belong to the same categorical variable
+    """
+    feature_groups = {}
+    numerical_features = []
+    
+    # Example mapping - adjust based on your actual feature names
+    feature_groups['location_type'] = [f for f in tabular_feature_names if f.startswith('location_type_')]
+    feature_groups['building_type'] = [f for f in tabular_feature_names if f.startswith('building_type_')]
+    feature_groups['coverage_type'] = [f for f in tabular_feature_names if f.startswith('coverage_type_')]
+    feature_groups['risk_category'] = [f for f in tabular_feature_names if f.startswith('risk_cat_')]
+    
+    # Identify numerical features (those not in any categorical group)
+    all_categorical_features = []
+    for group_features in feature_groups.values():
+        all_categorical_features.extend(group_features)
+    
+    numerical_features = [f for f in tabular_feature_names if f not in all_categorical_features]
+    
+    # Add numerical features as individual groups
+    for num_feat in numerical_features:
+        feature_groups[num_feat] = [num_feat]
+    
+    return feature_groups, numerical_features
+
+# Usage
+feature_groups, numerical_features = create_feature_groups(tabular_feature_names)
+print("Feature Groups:")
+for group_name, features in feature_groups.items():
+    print(f"  {group_name}: {features}")
+
+
+def create_feature_groups(tabular_feature_names):
+    """
+    Define which features belong to the same categorical variable
+    """
+    feature_groups = {}
+    numerical_features = []
+    
+    # Example mapping - adjust based on your actual feature names
+    feature_groups['location_type'] = [f for f in tabular_feature_names if f.startswith('location_type_')]
+    feature_groups['building_type'] = [f for f in tabular_feature_names if f.startswith('building_type_')]
+    feature_groups['coverage_type'] = [f for f in tabular_feature_names if f.startswith('coverage_type_')]
+    feature_groups['risk_category'] = [f for f in tabular_feature_names if f.startswith('risk_cat_')]
+    
+    # Identify numerical features (those not in any categorical group)
+    all_categorical_features = []
+    for group_features in feature_groups.values():
+        all_categorical_features.extend(group_features)
+    
+    numerical_features = [f for f in tabular_feature_names if f not in all_categorical_features]
+    
+    # Add numerical features as individual groups
+    for num_feat in numerical_features:
+        feature_groups[num_feat] = [num_feat]
+    
+    return feature_groups, numerical_features
+
+# Usage
+feature_groups, numerical_features = create_feature_groups(tabular_feature_names)
+print("Feature Groups:")
+for group_name, features in feature_groups.items():
+    print(f"  {group_name}: {features}")
+
+
+def create_feature_groups(tabular_feature_names):
+    """
+    Define which features belong to the same categorical variable
+    """
+    feature_groups = {}
+    numerical_features = []
+    
+    # Example mapping - adjust based on your actual feature names
+    feature_groups['location_type'] = [f for f in tabular_feature_names if f.startswith('location_type_')]
+    feature_groups['building_type'] = [f for f in tabular_feature_names if f.startswith('building_type_')]
+    feature_groups['coverage_type'] = [f for f in tabular_feature_names if f.startswith('coverage_type_')]
+    feature_groups['risk_category'] = [f for f in tabular_feature_names if f.startswith('risk_cat_')]
+    
+    # Identify numerical features (those not in any categorical group)
+    all_categorical_features = []
+    for group_features in feature_groups.values():
+        all_categorical_features.extend(group_features)
+    
+    numerical_features = [f for f in tabular_feature_names if f not in all_categorical_features]
+    
+    # Add numerical features as individual groups
+    for num_feat in numerical_features:
+        feature_groups[num_feat] = [num_feat]
+    
+    return feature_groups, numerical_features
+
+# Usage
+feature_groups, numerical_features = create_feature_groups(tabular_feature_names)
+print("Feature Groups:")
+for group_name, features in feature_groups.items():
+    print(f"  {group_name}: {features}")
